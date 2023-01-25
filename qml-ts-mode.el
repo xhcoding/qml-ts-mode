@@ -80,10 +80,13 @@
 ;;
 
 ;;; Require
+
 (require 'treesit)
-(require 'rx)
-(require 'c-ts-mode)    ; For comment indent and filling.
+(require 'c-ts-common)  ; For comment indent and filling.
 (require 'js)           ; Base js-ts-mode
+
+(eval-when-compile
+  (require 'rx))
 
 (declare-function treesit-parser-create "treesit.c")
 (declare-function treesit-search-subtree "treesit.c")
@@ -115,8 +118,8 @@
        ((node-is ")") parent-bol 0)
        ((node-is "]") parent-bol 0)
        ((node-is ">") parent-bol 0)
-       ((and (parent-is "comment") c-ts-mode--looking-at-star)
-        c-ts-mode--comment-start-after-first-star -1)
+       ((and (parent-is "comment") c-ts-common-looking-at-star)
+        c-ts-common-comment-start-after-first-star -1)
        ((parent-is "comment") prev-adaptive-prefix 0)
        ((parent-is "ternary_expression") parent-bol ,offset)
        ((parent-is "member_expression") parent-bol ,offset)
@@ -309,7 +312,7 @@ Return nil if there is no name or if NODE is not a defun node."
   :group 'qml-ts
   :syntax-table js-mode-syntax-table
   ;; Comment
-  (c-ts-mode-comment-setup)
+  (c-ts-common-comment-setup)
   (setq-local comment-multi-line t)
   (setq-local treesit-text-type-regexp
               (regexp-opt '("comment"
