@@ -68,6 +68,9 @@
 ;; 2023/01/24
 ;;      * First released.
 ;;
+;; 2024/07/20
+;;      * Fix not defined js--treesit-sentence-nodes in js.el
+;;
 
 ;;; Acknowledgements:
 ;;
@@ -84,6 +87,32 @@
 (require 'treesit)
 (require 'c-ts-common)  ; For comment indent and filling.
 (require 'js)           ; Base js-ts-mode
+
+(unless (boundp 'js--treesit-sentence-nodes)
+  (defvar js--treesit-sentence-nodes
+    '("import_statement"
+      "debugger_statement"
+      "expression_statement"
+      "if_statement"
+      "switch_statement"
+      "for_statement"
+      "for_in_statement"
+      "while_statement"
+      "do_statement"
+      "try_statement"
+      "with_statement"
+      "break_statement"
+      "continue_statement"
+      "return_statement"
+      "throw_statement"
+      "empty_statement"
+      "labeled_statement"
+      "variable_declaration"
+      "lexical_declaration"
+      "jsx_element"
+      "jsx_self_closing_element")
+    "Nodes that designate sentences in JavaScript.
+See `treesit-thing-settings' for more information."))
 
 (eval-when-compile
   (require 'rx))
