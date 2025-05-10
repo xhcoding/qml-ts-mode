@@ -147,6 +147,8 @@ See `treesit-thing-settings' for more information."))
        ((node-is ")") parent-bol 0)
        ((node-is "]") parent-bol 0)
        ((node-is ">") parent-bol 0)
+       ;; For "{" to have the same indentation as the parent
+       ((parent-is "ui_object_definition") parent-bol 0)
        ((and (parent-is "comment") c-ts-common-looking-at-star)
         c-ts-common-comment-start-after-first-star -1)
        ((parent-is "comment") prev-adaptive-prefix 0)
