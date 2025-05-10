@@ -329,6 +329,7 @@ Return nil if there is no name or if NODE is not a defun node."
        (treesit-search-subtree node "variable_declarator" nil nil 1) "name"))
      ((or "function_declaration" "method_definition" "class_declaration" "ui_signal")
       (treesit-node-child-by-field-name node "name"))
+     ("ui_property" (treesit-node-child-by-field-name node "name"))
      ("ui_object_definition"
       (treesit-node-child-by-field-name node "type_name")))
    t))
@@ -384,6 +385,7 @@ Return nil if there is no name or if NODE is not a defun node."
   ;; Imenu
   (setq treesit-simple-imenu-settings
         `(("Function" "\\`function_declaration\\'" nil nil)
+          ("Property" "\\`ui_property\\'" nil nil)
           ("Signal" "\\`ui_signal\\'" nil nil)
           ("Component" "\\`ui_object_definition\\'" nil nil)))
 
