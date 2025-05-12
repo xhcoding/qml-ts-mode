@@ -147,6 +147,8 @@ See `treesit-thing-settings' for more information."))
        ((node-is ")") parent-bol 0)
        ((node-is "]") parent-bol 0)
        ((node-is ">") parent-bol 0)
+       ;; For "{" to have the same indentation as the parent
+       ((parent-is "ui_object_definition") parent-bol 0)
        ((and (parent-is "comment") c-ts-common-looking-at-star)
         c-ts-common-comment-start-after-first-star -1)
        ((parent-is "comment") prev-adaptive-prefix 0)
@@ -181,138 +183,262 @@ See `treesit-thing-settings' for more information."))
   "QML keywords for tree-sitter font-locking.")
 
 
+(defun qml--is-node-id? (node)
+  "Check if NODE is an ui_binding node corresponding to the id."
+  (string= (treesit-node-text node) "id"))
+
+
+(defconst qml--treesit-font-lock-comment-settings
+  '((comment) @font-lock-comment-face))
+
+
+(defconst qml--treesit-font-lock-definitions-settings
+  '((function_declaration
+     name: (identifier) @font-lock-function-name-face)
+
+    (variable_declarator
+     name: (identifier) @font-lock-variable-name-face)
+
+    (ui_property
+     name: (identifier) @font-lock-property-name-face)
+
+    ;;   (variable_declarator
+    ;;    name: (array_pattern
+    ;;           (identifier)
+    ;;           (identifier)
+    ;;           @font-lock-function-name-face)
+    ;;    value: (array (number) (function)))
+
+    (import_clause (identifier) @font-lock-variable-name-face)
+    (import_clause (named_imports (import_specifier (identifier))
+                                  @font-lock-variable-name-face))
+
+    (required_parameter (identifier) @font-lock-variable-name-face)
+
+    (optional_parameter (identifier) @font-lock-variable-name-face)
+
+    (ui_signal
+     name: (identifier) @font-lock-function-name-face)
+
+    (ui_binding
+     name: [
+            (identifier) @font-lock-variable-use-face
+
+            ;; I'm not sure if this one ever appears
+            (nested_identifier) @font-lock-variable-name-face
+            ])
+    ))
+
+
+;; These are separated because we will use them to override values in
+;; qml--treesit-font-lock-definitions-settings
+(defconst qml--treesit-font-lock-definitions-extra-settings
+
+  '(
+    ;; Use font-lock-function-name-face for variables that store a function
+    (variable_declarator
+     name: (identifier) @font-lock-function-name-face
+     value: [(arrow_function) (function_expression)])
+
+    ;; Overwrite face for ui_binding nodes that are IDs fontify the ID name
+    ((ui_binding name: (identifier) @font-lock-variable-use-face
+                 value: (expression_statement) @font-lock-preprocessor-face)
+     (:pred qml--is-node-id? @font-lock-variable-use-face))
+    ))
+
+
+(defconst qml--treesit-font-lock-keywords-settings
+  `([,@js--treesit-keywords] @font-lock-keyword-face
+    [(this) (super)] @font-lock-keyword-face
+    [,@qml--treesit-keywords] @font-lock-keyword-face))
+
+
+(defconst qml--treesit-font-lock-string-settings
+  '((regex pattern: (regex_pattern)) @font-lock-regexp-face
+    (string) @font-lock-string-face))
+
+
+(defconst qml--treesit-font-lock-string_interpolation-settings
+  '((template_string) @js--fontify-template-string
+    (template_substitution ["${" "}"] @font-lock-misc-punctuation-face)))
+
+
+(defconst qml--treesit-font-lock-data-type-settings
+  '((type_identifier) @font-lock-type-face
+
+    (predefined_type) @font-lock-type-face
+
+    (ui_object_definition
+     type_name: (identifier) @font-lock-type-face)
+
+    (ui_object_definition
+     type_name: (nested_identifier) @font-lock-type-face)))
+
+
+;; I'm not sure this ever has any importance
+(defconst qml--treesit-font-lock-assignments-settings
+  '((assignment_expression
+     left: (_) @js--treesit-fontify-assignment-lhs)))
+
+
+(defconst qml--treesit-font-lock-constant-settings
+  '(((identifier) @font-lock-constant-face
+     (:match "^[A-Z_][A-Z_\\d]*$" @font-lock-constant-face))
+    [(true) (false) (null)] @font-lock-constant-face))
+
+
+;; Match variables created with "let" with color for constants
+(defconst qml--treesit-font-lock-let-constant-settings
+  '((lexical_declaration (variable_declarator name: (identifier) @font-lock-constant-face))))
+
+
+(defconst qml--treesit-font-lock-numbers-and-literals-settings
+  '((number) @font-lock-number-face
+    ((identifier) @font-lock-number-face
+     (:match "^\\(:?NaN\\|Infinity\\)$" @font-lock-number-face))))
+
+
+;; ;; I'm not sure what these are, and currently they are not included
+;; (defconst qml--treesit-font-lock-properties-settings
+;;   '(((property_identifier) @font-lock-property-face
+;;      (:pred js--treesit-property-not-function-p
+;;             @font-lock-property-face))
+
+;;     (pair value: (identifier) @font-lock-variable-name-face)
+
+;;     ((shorthand_property_identifier) @font-lock-property-face)
+
+;;     ((shorthand_property_identifier_pattern) @font-lock-property-face))
+;;   )
+
+
+;; This matches function calls, but not function declarations (which are in
+;; `qml--treesit-font-lock-definitions-settings`)
+(defconst qml--treesit-font-lock-function-call-settings
+  '((call_expression
+     function: (identifier) @font-lock-function-call-face)
+
+    (call_expression
+     function: (member_expression
+                object: (identifier) @font-lock-variable-use-face
+                ;; property: (property_identifier) @font-lock-function-call-face
+                ))
+
+    (call_expression
+     function: (member_expression
+                ;; object: (identifier) @font-lock-variable-use-face
+                property: (property_identifier) @font-lock-function-call-face))
+    ))
+
+
+(defconst qml--treesit-font-lock-operator-settings
+  `([,@js--treesit-operators] @font-lock-operator-face
+    (arrow_function "=>" @font-lock-preprocessor-face)
+    (ternary_expression ["?" ":"] @font-lock-operator-face)))
+
+
+(defconst qml--treesit-font-lock-bracket-settings
+  '((["(" ")" "[" "]" "{" "}"]) @font-lock-bracket-face))
+
+
+(defconst qml--treesit-font-lock-delimiter-settings
+  '((["," "." ";" ":"]) @font-lock-delimiter-face))
+
+
+(defconst qml--treesit-font-lock-escape-sequence-settings
+  '((escape_sequence) @font-lock-escape-face))
+
+
+;; Level 1 usually contains only comments and definitions.
+;; Level 2 usually adds keywords, strings, data types, etc.
+;; Level 3 usually represents full-blown fontifications, including
+;; assignments, constants, numbers and literals, etc.
+;; Level 4 adds everything else that can be fontified: delimiters,
 (defvar qml--treesit-font-lock-settings
   (treesit-font-lock-rules
-
+   ;; xxxxxxxxxx Level 1 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
    :language 'qmljs
    :feature 'comment
-   '((comment) @font-lock-comment-face)
+   qml--treesit-font-lock-comment-settings
 
    :language 'qmljs
-   :feature 'constant
-   '(((identifier) @font-lock-constant-face
-      (:match "^[A-Z_][A-Z_\\d]*$" @font-lock-constant-face))
-     [(true) (false) (null)] @font-lock-constant-face)
+   :feature 'definition
+   qml--treesit-font-lock-definitions-settings
 
+   :language 'qmljs
+   :feature 'definition
+   :override t
+   qml--treesit-font-lock-definitions-extra-settings
+   ;; xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+   ;; xxxxxxxxxx Level 2 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
    :language 'qmljs
    :feature 'keyword
-   `([,@js--treesit-keywords] @font-lock-keyword-face
-     [(this) (super)] @font-lock-keyword-face
-     [,@qml--treesit-keywords] @font-lock-keyword-face)
+   qml--treesit-font-lock-keywords-settings
 
    :language 'qmljs
    :feature 'string
-   '((regex pattern: (regex_pattern)) @font-lock-regexp-face
-     (string) @font-lock-string-face)
+   qml--treesit-font-lock-string-settings
 
    :language 'qmljs
    :feature 'string-interpolation
    :override t
-   '((template_string) @js--fontify-template-string
-     (template_substitution ["${" "}"] @font-lock-misc-punctuation-face))
+   qml--treesit-font-lock-string_interpolation-settings
 
    :language 'qmljs
    :feature 'type
-   '((type_identifier) @font-lock-type-face
+   qml--treesit-font-lock-data-type-settings
+   ;; xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-     (predefined_type) @font-lock-type-face
-
-     (ui_object_definition
-      type_name: (identifier) @font-lock-type-face)
-
-     (ui_object_definition
-      type_name: (nested_identifier) @font-lock-type-face))
-
-   :language 'qmljs
-   :feature 'definition
-   '((function_declaration
-      name: (identifier) @font-lock-function-name-face)
-
-     (variable_declarator
-      name: (identifier) @font-lock-variable-name-face)
-
-     (variable_declarator
-      name: (identifier) @font-lock-function-name-face
-      value: [(function) (arrow_function)])
-
-     (variable_declarator
-      name: (array_pattern
-             (identifier)
-             (identifier)
-             @font-lock-function-name-face)
-      value: (array (number) (function)))
-
-     (import_clause (identifier) @font-lock-variable-name-face)
-     (import_clause (named_imports (import_specifier (identifier))
-                                   @font-lock-variable-name-face))
-
-     (required_parameter (identifier) @font-lock-variable-name-face)
-
-     (optional_parameter (identifier) @font-lock-variable-name-face)
-
-     (ui_signal
-      name: (identifier) @font-lock-function-name-face)
-
-     (ui_binding
-      name: [
-             (identifier) @font-lock-variable-name-face
-             (nested_identifier) @font-lock-variable-name-face
-             ])
-
-     )
-
-   :language 'qmljs
-   :feature 'property
-   '(((property_identifier) @font-lock-property-face
-      (:pred js--treesit-property-not-function-p
-             @font-lock-property-face))
-
-     (pair value: (identifier) @font-lock-variable-name-face)
-
-     ((shorthand_property_identifier) @font-lock-property-face)
-
-     ((shorthand_property_identifier_pattern) @font-lock-property-face))
-
+   ;; xxxxxxxxxx Level 3 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
    :language 'qmljs
    :feature 'assignment
-   '((assignment_expression
-      left: (_) @js--treesit-fontify-assignment-lhs))
+   qml--treesit-font-lock-assignments-settings
 
    :language 'qmljs
-   :feature 'function
-   '((call_expression
-      function: (identifier) @font-lock-variable-name-face)
+   :feature 'constant
+   qml--treesit-font-lock-constant-settings
 
-     (call_expression
-      function: (member_expression
-                 object: (identifier) @font-lock-variable-name-face
-                 property: (property_identifier) @font-lock-function-name-face))
-     )
-
+   :language 'qmljs
+   :feature 'constant
+   qml--treesit-font-lock-let-constant-settings
 
    :language 'qmljs
    :feature 'number
-   '((number) @font-lock-number-face
-     ((identifier) @font-lock-number-face
-      (:match "^\\(:?NaN\\|Infinity\\)$" @font-lock-number-face)))
+   qml--treesit-font-lock-numbers-and-literals-settings
+   ;; xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
+   ;; xxxxxxxxxx Level 4 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   ;; ;; Properties
+   ;; :language 'qmljs
+   ;; :feature 'property
+   ;; qml--treesit-font-lock-properties-settings
+
+   ;; Function calls
+   :language 'qmljs
+   :feature 'function
+   qml--treesit-font-lock-function-call-settings
+
+   ;; operator
    :language 'qmljs
    :feature 'operator
-   `([,@js--treesit-operators] @font-lock-operator-face
-     (ternary_expression ["?" ":"] @font-lock-operator-face))
+   qml--treesit-font-lock-operator-settings
 
+   ;; brackets
    :language 'qmljs
    :feature 'bracket
-   '((["(" ")" "[" "]" "{" "}"]) @font-lock-bracket-face)
+   qml--treesit-font-lock-bracket-settings
 
+   ;; delimiters
    :language 'qmljs
    :feature 'delimiter
-   '((["," "." ";" ":"]) @font-lock-delimiter-face)
+   qml--treesit-font-lock-delimiter-settings
 
+   ;; escape-sequence
    :language 'qmljs
    :feature 'escape-sequence
    :override t
-   '((escape_sequence) @font-lock-escape-face)
+   qml--treesit-font-lock-escape-sequence-settings
    )
   "Tree-sitter font-lock settings.")
 
@@ -327,6 +453,7 @@ Return nil if there is no name or if NODE is not a defun node."
        (treesit-search-subtree node "variable_declarator" nil nil 1) "name"))
      ((or "function_declaration" "method_definition" "class_declaration" "ui_signal")
       (treesit-node-child-by-field-name node "name"))
+     ("ui_property" (treesit-node-child-by-field-name node "name"))
      ("ui_object_definition"
       (treesit-node-child-by-field-name node "type_name")))
    t))
@@ -340,56 +467,62 @@ Return nil if there is no name or if NODE is not a defun node."
   "Major mode for editing QML."
   :group 'qml-ts
   :syntax-table js-mode-syntax-table
-  ;; Comment
-  (c-ts-common-comment-setup)
-  (setq-local comment-multi-line t)
-  (setq-local treesit-text-type-regexp
-              (regexp-opt '("comment"
-                            "template_string")))
+  (when (treesit-ready-p 'qmljs)
+    ;; Comment
+    (c-ts-common-comment-setup)
+    (setq-local comment-multi-line t)
+    (setq-local treesit-text-type-regexp
+                (regexp-opt '("comment"
+                              "template_string")))
 
-  ;; Treesit setup
-  (treesit-parser-create 'qmljs)
+    ;; Treesit setup
+    (treesit-parser-create 'qmljs)
 
-  ;; Indent
-  (setq-local treesit-simple-indent-rules qml--treesit-indent-rules)
+    ;; Indent
+    (setq-local treesit-simple-indent-rules qml--treesit-indent-rules)
 
-  ;; Fontification.
-  ;; (setq-local treesit--font-lock-verbose t)
-  ;; (setq-local treesit-font-lock-level 4)
-  (setq-local treesit-font-lock-settings qml--treesit-font-lock-settings)
-  (setq-local treesit-font-lock-feature-list
-              '(( comment definition)
-                ( keyword string type)
-                ( assignment constant escape-sequence number
-                  pattern string-interpolation)
-                ( bracket delimiter function operator property)))
+    ;; Fontification.
+    ;; (setq-local treesit--font-lock-verbose t)
+    ;; (setq-local treesit-font-lock-level 4)
+    (setq-local treesit-font-lock-settings qml--treesit-font-lock-settings)
+    ;; Level 1 usually contains only comments and definitions.
+    ;; Level 2 usually adds keywords, strings, data types, etc.
+    ;; Level 3 usually represents full-blown fontifications, including
+    ;; assignments, constants, numbers and literals, etc.
+    ;; Level 4 adds everything else that can be fontified: delimiters,
+    (setq-local treesit-font-lock-feature-list
+                '(( comment definition)
+                  ( keyword string type)
+                  ( assignment constant escape-sequence number pattern string-interpolation)
+                  ( bracket delimiter function operator)
+                  ;; ( bracket delimiter function operator property)
+                  ))
 
-  ;; Navigation.
-  (setq-local treesit-defun-prefer-top-level t)
-  (setq-local treesit-defun-type-regexp
-              (rx (or "class_declaration"
-                      "method_definition"
-                      "function_declaration"
-                      "lexical_declaration"
-                      "ui_object_definition")))
+    ;; Navigation.
+    (setq-local treesit-defun-prefer-top-level t)
+    (setq-local treesit-defun-type-regexp
+                (rx (or "class_declaration"
+                        "method_definition"
+                        "function_declaration"
+                        "lexical_declaration"
+                        "ui_object_definition")))
 
-  (setq-local treesit-defun-name-function #'qml--treesit-defun-name)
+    (setq-local treesit-defun-name-function #'qml--treesit-defun-name)
 
-  (setq-local treesit-sentence-type-regexp
-              (regexp-opt js--treesit-sentence-nodes))
+    (setq-local treesit-sentence-type-regexp
+                (regexp-opt js--treesit-sentence-nodes))
 
 
-  ;; Imenu
-  (setq treesit-simple-imenu-settings
-        `(("Function" "\\`function_declaration\\'" nil nil)
-          ("Signal" "\\`ui_signal\\'" nil nil)
-          ("Component" "\\`ui_object_definition\\'" nil nil)))
+    ;; Imenu
+    (setq treesit-simple-imenu-settings
+          `(("Function" "\\`function_declaration\\'" nil nil)
+            ("Property" "\\`ui_property\\'" nil nil)
+            ("Signal" "\\`ui_signal\\'" nil nil)
+            ("Component" "\\`ui_object_definition\\'" nil nil)))
 
-  (treesit-major-mode-setup)
-  )
+    (treesit-major-mode-setup)))
 
 
 (provide 'qml-ts-mode)
 
 ;;; qml-ts-mode.el ends here
-
