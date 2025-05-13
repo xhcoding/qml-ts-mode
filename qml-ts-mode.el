@@ -179,7 +179,8 @@ See `treesit-thing-settings' for more information."))
 (defvar qml--treesit-keywords
   '( "on" "property" "signal" "declare" "enum" "export" "implements"
      "interface" "keyof" "namespace" "type" "override" "abstract"
-     "private" "protected" "public" "default" "readonly" "required")
+     "private" "protected" "public" "default" "readonly" "required"
+     "pragma")
   "QML keywords for tree-sitter font-locking.")
 
 
