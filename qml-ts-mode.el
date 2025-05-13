@@ -211,6 +211,8 @@ See `treesit-thing-settings' for more information."))
     (import_clause (named_imports (import_specifier (identifier))
                                   @font-lock-variable-name-face))
 
+    (ui_signal_parameter (identifier) @font-lock-variable-name-face)
+
     (required_parameter (identifier) @font-lock-variable-name-face)
 
     (optional_parameter (identifier) @font-lock-variable-name-face)
