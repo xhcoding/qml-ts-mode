@@ -202,12 +202,10 @@ See `treesit-thing-settings' for more information."))
     (ui_property
      name: (identifier) @font-lock-property-name-face)
 
-    ;;   (variable_declarator
-    ;;    name: (array_pattern
-    ;;           (identifier)
-    ;;           (identifier)
-    ;;           @font-lock-function-name-face)
-    ;;    value: (array (number) (function)))
+    (variable_declarator
+     name: (array_pattern
+            (identifier)
+            @font-lock-variable-name-face))
 
     (import_clause (identifier) @font-lock-variable-name-face)
     (import_clause (named_imports (import_specifier (identifier))
