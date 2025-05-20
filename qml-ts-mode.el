@@ -180,7 +180,7 @@ See `treesit-thing-settings' for more information."))
   '( "on" "property" "signal" "declare" "enum" "export" "implements"
      "interface" "keyof" "namespace" "type" "override" "abstract"
      "private" "protected" "public" "default" "readonly" "required"
-     "pragma")
+     "component" "pragma")
   "QML keywords for tree-sitter font-locking.")
 
 
@@ -273,7 +273,9 @@ See `treesit-thing-settings' for more information."))
      type_name: (identifier) @font-lock-type-face)
 
     (ui_object_definition
-     type_name: (nested_identifier) @font-lock-type-face)))
+     type_name: (nested_identifier) @font-lock-type-face)
+
+    (ui_inline_component name: (identifier) @font-lock-type-face)))
 
 
 ;; I'm not sure this ever has any importance
