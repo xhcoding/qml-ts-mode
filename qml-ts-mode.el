@@ -184,14 +184,6 @@ See `treesit-thing-settings' for more information."))
   "QML keywords for tree-sitter font-locking.")
 
 
-(defun qml--is-node-id? (node)
-  "Check if NODE is an ui_binding node corresponding to the id."
-  (string= (treesit-node-text node) "id"))
-
-
-(defun qml--is-parent? (node)
-  "Check if NODE is `parent'."
-  (string= (treesit-node-text node) "parent"))
 
 
 (defconst qml--treesit-font-lock-comment-settings
@@ -249,17 +241,11 @@ See `treesit-thing-settings' for more information."))
     ;; Overwrite face for ui_binding nodes that are IDs fontify the ID name
     ((ui_binding name: (identifier) @font-lock-variable-use-face
                  value: (expression_statement) @font-lock-preprocessor-face)
-     (:pred qml--is-node-id? @font-lock-variable-use-face))
+     (:match "^id$" @font-lock-variable-use-face))
 
-    ;; Match "parent" alone
-    ((expression_statement (identifier)) @font-lock-keyword-face
-     (:pred qml--is-parent? @font-lock-keyword-face)
-     )
-
-    ;; Match "parent" in an expression such as "parent.something"
-    ((member_expression object: (identifier) @font-lock-keyword-face property: (property_identifier))
-     (:pred qml--is-parent? @font-lock-keyword-face)
-     )
+    ;; Match "parent" as an identifier
+    ((identifier) @font-lock-keyword-face
+     (:match "^parent$" @font-lock-keyword-face))
     ))
 
 
