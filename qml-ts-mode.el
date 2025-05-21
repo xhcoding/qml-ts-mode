@@ -276,7 +276,14 @@ See `treesit-thing-settings' for more information."))
     (ui_object_definition
      type_name: (nested_identifier) @font-lock-type-face)
 
-    (ui_inline_component name: (identifier) @font-lock-type-face)))
+    (ui_inline_component name: (identifier) @font-lock-type-face)
+
+    ;; Match the `Qt' singleton, which is a type that provides utility
+    ;; functions, properties, and enums.
+    ((member_expression object: (identifier) @font-lock-type-face)
+     (:match "^Qt$" @font-lock-type-face)
+     )
+    ))
 
 
 ;; I'm not sure this ever has any importance
