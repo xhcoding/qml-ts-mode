@@ -462,9 +462,8 @@ Return nil if there is no name or if NODE is not a defun node."
      ("lexical_declaration"
       (treesit-node-child-by-field-name
        (treesit-search-subtree node "variable_declarator" nil nil 1) "name"))
-     ((or "function_declaration" "method_definition" "class_declaration" "ui_signal")
+     ((or "function_declaration" "method_definition" "class_declaration" "ui_signal" "ui_property")
       (treesit-node-child-by-field-name node "name"))
-     ("ui_property" (treesit-node-child-by-field-name node "name"))
      ("ui_object_definition"
       (treesit-node-child-by-field-name node "type_name")))
    t))
