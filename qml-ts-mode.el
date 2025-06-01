@@ -179,13 +179,11 @@ See `treesit-thing-settings' for more information."))
 (defvar qml--treesit-keywords
   '( "on" "property" "signal" "declare" "enum" "export" "implements"
      "interface" "keyof" "namespace" "type" "override" "abstract"
-     "private" "protected" "public" "default" "readonly" "required")
+     "private" "protected" "public" "default" "readonly" "required"
+     "component" "pragma")
   "QML keywords for tree-sitter font-locking.")
 
 
-(defun qml--is-node-id? (node)
-  "Check if NODE is an ui_binding node corresponding to the id."
-  (string= (treesit-node-text node) "id"))
 
 
 (defconst qml--treesit-font-lock-comment-settings
@@ -202,16 +200,16 @@ See `treesit-thing-settings' for more information."))
     (ui_property
      name: (identifier) @font-lock-property-name-face)
 
-    ;;   (variable_declarator
-    ;;    name: (array_pattern
-    ;;           (identifier)
-    ;;           (identifier)
-    ;;           @font-lock-function-name-face)
-    ;;    value: (array (number) (function)))
+    (variable_declarator
+     name: (array_pattern
+            (identifier)
+            @font-lock-variable-name-face))
 
     (import_clause (identifier) @font-lock-variable-name-face)
     (import_clause (named_imports (import_specifier (identifier))
                                   @font-lock-variable-name-face))
+
+    (ui_signal_parameter (identifier) @font-lock-variable-name-face)
 
     (required_parameter (identifier) @font-lock-variable-name-face)
 
@@ -243,7 +241,11 @@ See `treesit-thing-settings' for more information."))
     ;; Overwrite face for ui_binding nodes that are IDs fontify the ID name
     ((ui_binding name: (identifier) @font-lock-variable-use-face
                  value: (expression_statement) @font-lock-preprocessor-face)
-     (:pred qml--is-node-id? @font-lock-variable-use-face))
+     (:match "^id$" @font-lock-variable-use-face))
+
+    ;; Match "parent" as an identifier
+    ((identifier) @font-lock-keyword-face
+     (:match "^parent$" @font-lock-keyword-face))
     ))
 
 
@@ -272,7 +274,16 @@ See `treesit-thing-settings' for more information."))
      type_name: (identifier) @font-lock-type-face)
 
     (ui_object_definition
-     type_name: (nested_identifier) @font-lock-type-face)))
+     type_name: (nested_identifier) @font-lock-type-face)
+
+    (ui_inline_component name: (identifier) @font-lock-type-face)
+
+    ;; Match the `Qt' singleton, which is a type that provides utility
+    ;; functions, properties, and enums.
+    ((member_expression object: (identifier) @font-lock-type-face)
+     (:match "^Qt$" @font-lock-type-face)
+     )
+    ))
 
 
 ;; I'm not sure this ever has any importance
@@ -451,9 +462,8 @@ Return nil if there is no name or if NODE is not a defun node."
      ("lexical_declaration"
       (treesit-node-child-by-field-name
        (treesit-search-subtree node "variable_declarator" nil nil 1) "name"))
-     ((or "function_declaration" "method_definition" "class_declaration" "ui_signal")
+     ((or "function_declaration" "method_definition" "class_declaration" "ui_signal" "ui_property")
       (treesit-node-child-by-field-name node "name"))
-     ("ui_property" (treesit-node-child-by-field-name node "name"))
      ("ui_object_definition"
       (treesit-node-child-by-field-name node "type_name")))
    t))
